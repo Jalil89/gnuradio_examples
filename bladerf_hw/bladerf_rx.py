@@ -33,4 +33,4 @@ class bladerf_rx(object):
         osmosdr_source_0.set_antenna("", 0)
         osmosdr_source_0.set_bandwidth(26000000, 0)
         
-        return osmosdr_source
+        return osmosdr_source_0

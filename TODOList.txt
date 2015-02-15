@@ -3,14 +3,15 @@ Things to do (each should be done in a day):
 * Implement minstrel - done
 * Install BladeRF on LG - done
 * Implement ACKING - done
-* Implement TS packet parsing - undone
-* Implement tunnel app - undone
+* Implement tunnel app - done
+* Test for everything to work - undone
 
 == By end of this week ==
 
 * Implement HM - undone
-* Perform experiments - undone 
+* Perform experiments - done 
 * Update minstrel - undone
+* Implement TS packet parsing - done
 * Update the paper
 
 == By end of next week ==

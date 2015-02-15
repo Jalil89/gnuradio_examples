@@ -1,6 +1,6 @@
 import time
 
-current_micro_time = lambda: int(round(time.time()))
+current_micro_time = lambda: int(round(time.time()*1000000))
 
 
 class ack(object):
@@ -13,10 +13,11 @@ class ack(object):
     def wait_for_ack(self):
         self._is_waiting = True
         last_time = current_micro_time()
-        while self._is_waiting and  current_micro_time() - last_time < 1000:
+        while self._is_waiting and  current_micro_time() - last_time < self._ack_timeout:
+            #print last_time, current_micro_time()
             continue
         if self._is_waiting:
-            self._ack_timeout = False
+            self._is_waiting = False
             return False
         else:
             return True

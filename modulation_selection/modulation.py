@@ -8,7 +8,7 @@ class modulation(object):
         self._rate = rate # in bitspersecond
         self._P = 0
         self._packet_air_time = packet_air_time
-        self._total_packets_transmitted = 0.0
+        self._total_packets_transmitted = 1.0
         self._packets_transmitted_successfully = 0.0
         self._megabits_transmitted = 0.0
         
@@ -16,19 +16,20 @@ class modulation(object):
         if success:
             self._packets_transmitted_successfully+=1
         self._total_packets_transmitted+=1
-        self._megabits_transmitted += bytes*8 
+        self._megabits_transmitted += bytes*8/1000000.0 
     
     def _get_success_prob(self):
         return (self._packets_transmitted_successfully/self._total_packets_transmitted)
     
     
     def _reset_transmission_history(self):
-        self._total_packets_transmitted = 0.0
+        self._total_packets_transmitted = 1.0
         self._packets_transmitted_successfully = 0.0
         
     
     def calculate_throughput(self,ewma_level):
-        self._P= self._calculate_ewma(ewma_level)
+        if self._total_packets_transmitted == 1.0:
+            self._P= self._calculate_ewma(ewma_level)
         self.reset()
         return (self._P * self._megabits_transmitted) / self._packet_air_time
     

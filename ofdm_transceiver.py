@@ -31,8 +31,11 @@ from gnuradio import blocks
 from gnuradio import digital
 
 # from current dir
-from transceiver_utils import *
-from bladerf_hw import *
+from transceiver_utils.transmit_path import *
+from transceiver_utils.receive_path import *
+from bladerf_hw.bladerf_tx import *
+from bladerf_hw.bladerf_rx import *
+from ack_utils.ack import *
 
 import struct, sys, os
 import random, time, struct
@@ -54,7 +57,7 @@ def open_tun_interface(tun_device_filename):
     return (tun, ifname)
 
 class my_top_block(gr.top_block):
-    def __init__(self, callback,callback_msb, callback_lsb, options):
+    def __init__(self, callback, options):
         gr.top_block.__init__(self)
         self.osmosdr_source = bladerf_rx(options.devicenum).get_sdr() 
         self.osmosdr_sink = bladerf_tx(options.devicenum).get_sdr()
@@ -71,18 +74,22 @@ class my_top_block(gr.top_block):
 
 def main():
 
-    global n_rcvd, n_right, sock
+    global n_rcvd, n_right, oack
     n_rcvd = 0
     n_right = 0
-
-    sock = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) # UDP
+    
+    
+    def send_pkt(payload='', eof=False):
+        return tb.txpath.send_pkt(payload, eof)
+    
     def rx_callback(ok, payload):
-        global n_rcvd, n_right, sock
+        global n_rcvd, n_right, oack
         n_rcvd += 1
         (pktno,) = struct.unpack('!H', payload[0:2])
         data  = payload[2:]
         if ok:
             n_right += 1
+            oack.send_ack()
         print "ok: %r \t pktno: %d \t n_rcvd: %d \t n_right: %d \t n_right: %d" % (ok, pktno, n_rcvd, n_right, len(data))
    
     parser = OptionParser(option_class=eng_option, conflict_handler="resolve")
@@ -103,8 +110,8 @@ def main():
                       help="Set gain in dB (default is midpoint)")
     parser.add_option("-G", "--gains", type="string", default=None,
                       help="Set named gain in dB, name:gain,name:gain,...")
-    parser.add_option("-r", "--record", type="string", default="/tmp/name-f%F-s%S-t%T.cfile",
-                      help="Filename to record to, available wildcards: %S: sample rate, %F: center frequency, %T: timestamp, Example: /tmp/name-f%F-s%S-t%T.cfile")
+    parser.add_option("-r", "--role", type="string", default="receiver",
+                      help="the role of the node: sender or receiver")
     parser.add_option("", "--dc-offset-mode", type="int", default=None,
                       help="Set the RX frontend DC offset correction mode")
     parser.add_option("", "--iq-balance-mode", type="int", default=None,
@@ -135,7 +142,7 @@ def main():
 
     (options, args) = parser.parse_args ()
 
-    (tun_fd, tun_ifname) = open_tun_interface(options.tun_device_filename)
+    #(tun_fd, tun_ifname) = open_tun_interface(options.tun_device_filename)
 
     # build the graph
     tb = my_top_block(rx_callback, options)
@@ -144,7 +151,25 @@ def main():
     if r != gr.RT_OK:
         print "Warning: failed to enable realtime scheduling"
 
+    oack = ack(send_pkt)
     tb.start()                      # start flow graph
+    pktno = 1
+    pkt_size = 1000
+    role = options.role
+    if role=='sender':
+        while True:
+            
+            data = (pkt_size - 2) * chr(pktno & 0xff) 
+            #data, addr = sock.recvfrom(1500) # buffer size is 1024 bytes
+            payload1 = struct.pack('!H', pktno & 0xffff) + data
+            pktno += 1
+            send_pkt(payload1)
+            if oack.wait_for_ack() is False:
+                sys.stderr.write('x')
+            else:
+                sys.stderr.write('.')
+    
+    
     tb.wait()                       # wait for it to finish
 
 if __name__ == '__main__':
