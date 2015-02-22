@@ -12,6 +12,8 @@
 #define B_FRAME 4
 #define DATA 5
 
+#define NON_TS 6
+
 //typedef enum {I_FRAME, P_FRAME, B_FRAME, NONE} h264_frame_t;
 typedef unsigned Boolean; 
  
@@ -80,6 +82,11 @@ Boolean PES_check_sanity(){
 	return FALSE;
 }
 
+
+Boolean TS_check_sanity(){
+	if (TS_header.sync_byte == 0x47) return TRUE;
+	return FALSE;
+}
 unsigned PES_parse_packet(unsigned char offset){
 	unsigned char o = offset;
 	//printf("PES_header offset = %u\n", (unsigned)o);
@@ -110,11 +117,13 @@ unsigned PES_parse_packet(unsigned char offset){
 		current_frame = B_FRAME;
 		printf("B frame header\n");
 	}*/
-	if (NALHEADER.ref_num[0] == 0x41 && NALHEADER.ref_num[1] == 0x9A){
+	if (NALHEADER.ref_num[0] == 0x41) // && NALHEADER.ref_num[1] == 0x9A)
+	{
 		current_frame = P_FRAME;
 		//printf("P frame header\n");
-	}else if (NALHEADER.ref_num[0] == 0x01 && NALHEADER.ref_num[1] == 0x9E){
-		current_frame = P_FRAME;
+	}else if (NALHEADER.ref_num[0] == 0x01 ) // && NALHEADER.ref_num[1] == 0x9E){
+	{
+		current_frame = B_FRAME;
 		//printf("B frame header\n");
 	}
 	else {
@@ -124,7 +133,7 @@ unsigned PES_parse_packet(unsigned char offset){
 	}
 	return current_frame;
 }
-
+ 
 void TS_header_decode()
 {
 	
@@ -145,6 +154,7 @@ unsigned TS_packet_classify(){
 	unsigned res = -1;
 	memcpy(TS_raw_header,TS_packet,sizeof(TS_raw_header));
 	TS_header_decode();
+	if (!TS_check_sanity()) return NON_TS;
 	unsigned char offset = 0;
 	if (TS_header.adaption_field_control == 1) { 
 		//printf("payload only\n");
@@ -180,28 +190,32 @@ unsigned TS_packet_classify(){
 	return res;
 }
 
-unsigned ts_get_type(const char *ts_raw_data){
-	assert( sizeof(ts_raw_data) == TS_PACKET_SIZE);
-	memcpy(TS_packet,ts_raw_data,sizeof(ts_raw_data));
+unsigned ts_get_type(char* ts_raw_data){
+	//printf("sizeof input string is %u\n",(unsigned)strlen(ts_raw_data) );
+	//assert( strlen(ts_raw_data) == TS_PACKET_SIZE);
+	memcpy(TS_packet,ts_raw_data,TS_PACKET_SIZE);
 	return TS_packet_classify();
 }
 
-/*
+
 int main(int argc, char** argv)
 {
     char* filename = argv[1];
-	unsigned int ts_packets = atoi(argv[2]);
+    unsigned int ts_packets = atoi(argv[2]);
     FILE *fp = fopen(filename,"rb");
+    unsigned char ts_raw[TS_PACKET_SIZE];
     unsigned bytes_read;
-	unsigned count = 1;
+    unsigned count = 1;
     while (!feof(fp) && count<ts_packets){
-        bytes_read = fread(TS_packet, 1,TS_PACKET_SIZE, fp);
+        bytes_read = fread(ts_raw, 1,TS_PACKET_SIZE, fp);
         assert(bytes_read == TS_PACKET_SIZE);
-        memcpy(TS_raw_header,TS_packet,sizeof(TS_raw_header));
-		printf("\n\nTS packet %u\n", count);
-        TS_packet_print();
-		count ++;
+        //memcpy(TS_raw_header,TS_packet,sizeof(TS_raw_header));
+	//printf("\n\nTS packet %u\n", count);
+        //TS_packet_print();
+	unsigned out = ts_get_type((char*)ts_raw);
+	//printf("%u \n", out);
+	count ++;
     }
     fclose(fp);
 }
-*/
+
